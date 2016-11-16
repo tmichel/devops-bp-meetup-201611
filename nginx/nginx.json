@@ -1,0 +1,78 @@
+{
+  "variables": {
+    "vpc_id": null,
+    "subnet_id": null,
+
+    "docker_repo": "meetup/devops",
+    "docker_tag": "201611",
+
+    "aws_ami_name": "meetup-devops-nginx",
+    "aws_region": "us-east-1",
+    "aws_instance_type": "m4.large",
+    "aws_base_ami": "ami-40d28157"
+  },
+  "builders": [
+    {
+      "type": "docker",
+      "image": "ubuntu:xenial",
+      "commit": true
+    },
+    {
+      "type":            "amazon-ebs",
+      "access_key":      "{{user `aws_access_key`}}",
+      "secret_key":      "{{user `aws_secret_key`}}",
+      "region":          "{{user `aws_region`}}",
+      "source_ami":      "{{user `aws_base_ami`}}",
+      "instance_type":   "{{user `aws_instance_type`}}",
+      "ami_name":        "{{user `aws_ami_name`}}-{{isotime `20060102-1504`}}",
+      "ami_description": "{{user `aws_ami_name`}}",
+      "run_tags": {
+        "ami-create":    "{{user `aws_ami_name`}}",
+        "Name":          "packer-{{user `aws_ami_name`}}"
+      },
+      "tags": {
+        "AMI":  "{{user `aws_ami_name`}}",
+        "Name": "{{user `aws_ami_name`}}"
+      },
+
+      "vpc_id":                       "{{user `vpc_id`}}",
+      "subnet_id":                    "{{user `subnet_id`}}",
+      "ssh_username":                 "ubuntu",
+      "associate_public_ip_address":  true
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "file",
+      "source": "html",
+      "destination": "/tmp"
+    },
+    {
+      "type": "shell",
+      "inline": [
+        "apt update",
+        "apt install nginx -y --no-install-recommends",
+        "mv /tmp/html/* /var/www/html"
+      ],
+      "only": ["docker"]
+    },
+    {
+      "type": "shell",
+      "execute_command": "{{ .Vars }} sudo -E sh '{{ .Path }}'",
+      "inline": [
+        "apt update",
+        "apt install nginx -y --no-install-recommends",
+        "mv /tmp/html/* /var/www/html"
+      ],
+      "only": ["amazon-ebs"]
+    }
+  ],
+  "post-processors": [
+    {
+      "type": "docker-tag",
+      "repository": "{{user `docker_repo`}}",
+      "tag": "{{user `docker_tag`}}",
+      "only": ["docker"]
+    }
+  ]
+}

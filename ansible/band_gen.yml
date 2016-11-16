@@ -1,0 +1,31 @@
+---
+- hosts: default
+  tasks:
+    - name: build service
+      local_action: shell GOOS=linux go build -o band-gen -v service.go
+      become: no
+    - name: Copy to service binary to remote host
+      copy:
+        src: band-gen
+        dest: /srv/band-gen
+        mode: 0755
+    - name: systemd service file
+      copy:
+        dest: /etc/systemd/system/band-gen.service
+        content: |
+          [Unit]
+          Description=band-gen
+
+          [Service]
+          ExecStart=/srv/band-gen
+          Environment=PORT=8080
+          Restart=on-failure
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+    - name: enable service
+      systemd:
+        name: band-gen
+        daemon_reload: yes
+        enabled: yes
